@@ -16,12 +16,36 @@ app.use(cors({ origin: clientOrigin, credentials: false }));
 app.use(express.json({ limit: "1mb" }));
 
 app.get("/api/health", (req, res) => {
+  let supabaseKeyRole = null;
+  let supabaseKeyRef = null;
+  let supabaseUrlHost = null;
+
+  try {
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+    const payload = JSON.parse(Buffer.from(key.split(".")[1] || "", "base64url").toString("utf8"));
+    supabaseKeyRole = payload.role || null;
+    supabaseKeyRef = payload.ref || null;
+  } catch {
+    supabaseKeyRole = "unreadable";
+  }
+
+  try {
+    supabaseUrlHost = process.env.SUPABASE_URL ? new URL(process.env.SUPABASE_URL).host : null;
+  } catch {
+    supabaseUrlHost = "invalid";
+  }
+
   res.json({
     ok: true,
     services: {
       alphaVantage: Boolean(process.env.ALPHA_VANTAGE_API_KEY),
       llm: Boolean(process.env.LLM_API_KEY),
       supabase: isSupabaseConfigured(),
+    },
+    supabase: {
+      urlHost: supabaseUrlHost,
+      keyRole: supabaseKeyRole,
+      keyRef: supabaseKeyRef,
     },
   });
 });
