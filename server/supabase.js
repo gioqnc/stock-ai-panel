@@ -88,13 +88,16 @@ export async function saveAnalysis({ symbol, quote, analysis }) {
       if (shouldUseLocalPowerShellFallback(error)) {
         throw error;
       }
-      throw new AppError("Supabase 保存失败", 500, error.message);
+      throw new AppError("Supabase save failed", 500, error.message || JSON.stringify(error));
     }
 
     return { persisted: true, id: data.id };
   } catch (error) {
+    if (error?.status) {
+      throw error;
+    }
     if (!shouldUseLocalPowerShellFallback(error)) {
-      throw new AppError("Supabase 保存失败", 500, error.message);
+      throw new AppError("Supabase save failed", 500, error.message || String(error));
     }
 
     const rows = await requestSupabaseRest({
@@ -124,13 +127,16 @@ export async function listAnalyses() {
       if (shouldUseLocalPowerShellFallback(error)) {
         throw error;
       }
-      throw new AppError("Supabase 历史记录读取失败", 500, error.message);
+      throw new AppError("Supabase history read failed", 500, error.message || JSON.stringify(error));
     }
 
     return { records: data || [], persisted: true };
   } catch (error) {
+    if (error?.status) {
+      throw error;
+    }
     if (!shouldUseLocalPowerShellFallback(error)) {
-      throw new AppError("Supabase 历史记录读取失败", 500, error.message);
+      throw new AppError("Supabase history read failed", 500, error.message || String(error));
     }
 
     const rows = await requestSupabaseRest({
