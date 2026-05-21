@@ -226,7 +226,7 @@ function App() {
     const startedAt = Date.now()
 
     try {
-      const data = await apiRequest<AnalyzeResponse>('/api/analyze', {
+      const data = await apiRequest<AnalyzeResponse>('/api/stock-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ symbol: normalizedSymbol }),

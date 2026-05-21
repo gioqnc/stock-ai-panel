@@ -63,7 +63,7 @@ app.get("/api/stock/:symbol", async (req, res, next) => {
   }
 });
 
-app.post("/api/analyze", async (req, res, next) => {
+async function handleStockAnalysis(req, res, next) {
   try {
     const symbol = validateSymbol(req.body?.symbol);
     const quote = await fetchStockData(symbol);
@@ -81,7 +81,10 @@ app.post("/api/analyze", async (req, res, next) => {
   } catch (error) {
     next(error);
   }
-});
+}
+
+app.post("/api/stock-analysis", handleStockAnalysis);
+app.post("/api/analyze", handleStockAnalysis);
 
 app.get("/api/analyses", async (req, res, next) => {
   try {

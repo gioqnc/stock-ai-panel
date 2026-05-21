@@ -142,11 +142,12 @@ export const AnalysisSchema = z.object({
 |---|---|---|
 | `GET` | `/api/health` | 查看环境变量配置状态 |
 | `GET` | `/api/stock/:symbol` | 获取股票行情 |
-| `POST` | `/api/analyze` | 获取行情、调用 LLM、保存 Supabase |
+| `POST` | `/api/stock-analysis` | 获取行情、调用 LLM、保存 Supabase |
+| `POST` | `/api/analyze` | 兼容旧版本的分析接口 |
 | `GET` | `/api/analyses` | 获取历史分析记录 |
 | `GET` | `/api/prompt-template` | 查看 Prompt 模板 |
 
-`POST /api/analyze` 请求体：
+`POST /api/stock-analysis` 请求体：
 
 ```json
 {
