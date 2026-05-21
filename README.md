@@ -6,7 +6,7 @@
 
 ## 在线访问
 
-Render URL：部署后填写，例如 `https://stock-ai-panel.onrender.com`
+Render URL：https://stock-ai-panel-wury.onrender.com/
 
 ## 功能
 
@@ -28,6 +28,8 @@ Render URL：部署后填写，例如 `https://stock-ai-panel.onrender.com`
 - OpenAI-compatible Chat Completions API
 - Supabase Postgres
 - Render
+
+行情源说明：项目优先使用 Yahoo Finance 免 key 行情接口，避免 Alpha Vantage 免费额度过低导致频繁限流；如果配置了 `STOOQ_API_KEY` 会优先尝试 Stooq，Alpha Vantage 作为备用行情源。
 
 ## 本地运行
 
@@ -93,6 +95,12 @@ create index if not exists idx_stock_analyses_symbol
 on stock_analyses(symbol);
 ```
 
+## Supabase 保存记录截图
+
+下图展示了 `stock_analyses` 表中保存的股票分析记录，包含 `symbol`、`quote`、`analysis`、`created_at` 等字段。
+
+![Supabase 保存记录](docs/supabase-records.png)
+
 ## Prompt 设计
 
 项目后端文件：`server/llm.js`
@@ -100,10 +108,12 @@ on stock_analyses(symbol);
 核心 Prompt：
 
 ```text
-Analyze the following stock market data.
-Return ONLY valid JSON. Do not include markdown, comments, explanations, or extra text.
+你是一个股票数据分析助手。
 
-The JSON must match this schema exactly:
+请根据下面的股票行情数据做一个简洁分析。
+必须只返回合法 JSON，不要写 Markdown，不要写解释，不要写多余文字。
+
+JSON 必须严格符合这个结构：
 {
   "type": "object",
   "required": ["summary", "sentiment", "risk_level"],
@@ -115,14 +125,14 @@ The JSON must match this schema exactly:
   }
 }
 
-Rules:
-- sentiment must be one of: Bullish, Neutral, Bearish.
-- risk_level must be one of: Low, Medium, High.
-- Do not provide investment advice.
-- Base your answer only on the provided data.
-- The summary should be 1-3 concise sentences.
+规则：
+- summary 用中文写，1 到 3 句话，直接说明最近走势和原因。
+- sentiment 只能是：Bullish、Neutral、Bearish。
+- risk_level 只能是：Low、Medium、High。
+- 不要给投资建议，只做技术演示分析。
+- 只能基于我提供的数据分析，不要编造其他信息。
 
-Stock data:
+股票数据：
 {{stock_data_json}}
 ```
 
@@ -250,6 +260,28 @@ server: {
 ```js
 app.use(cors({ origin: clientOrigin, credentials: false }));
 ```
+
+### 问题：线上点击 AI 分析并保存时显示 Failed to fetch
+
+现象：
+
+```text
+Failed to fetch
+```
+
+排查：
+
+用 AI 工具和浏览器调试时发现，后端接口和 Supabase 保存逻辑本身是正常的，历史记录里已经能看到新数据。但前端调用 `POST /api/analyze` 时，浏览器环境会直接报 `Failed to fetch`，页面拿不到响应。
+
+解决：
+
+1. 将前端分析接口从 `/api/analyze` 改为 `/api/stock-analysis`，避开浏览器或插件对 `analyze` 路径的误拦截。
+2. 后端新增 `POST /api/stock-analysis`，同时保留 `/api/analyze` 作为兼容旧接口。
+3. 前端增加恢复逻辑：如果分析请求失败，但后端已经保存成功，就从 `/api/analyses` 读取最新历史记录并展示。
+
+结果：
+
+线上重新部署后，点击 `AI 分析并保存` 可以展示行情、AI JSON 分析结果，并写入 Supabase 历史记录。
 
 ## 参考链接
 

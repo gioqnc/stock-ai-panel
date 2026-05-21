@@ -19,20 +19,22 @@ const analysisJsonSchema = {
 };
 
 function buildPrompt(stockData) {
-  return `Analyze the following stock market data.
-Return ONLY valid JSON. Do not include markdown, comments, explanations, or extra text.
+  return `你是一个股票数据分析助手。
 
-The JSON must match this schema exactly:
+请根据下面的股票行情数据做一个简洁分析。
+必须只返回合法 JSON，不要写 Markdown，不要写解释，不要写多余文字。
+
+JSON 必须严格符合这个结构：
 ${JSON.stringify(analysisJsonSchema, null, 2)}
 
-Rules:
-- sentiment must be one of: Bullish, Neutral, Bearish.
-- risk_level must be one of: Low, Medium, High.
-- Do not provide investment advice.
-- Base your answer only on the provided data.
-- The summary should be 1-3 concise sentences.
+规则：
+- summary 用中文写，1 到 3 句话，直接说明最近走势和原因。
+- sentiment 只能是：Bullish、Neutral、Bearish。
+- risk_level 只能是：Low、Medium、High。
+- 不要给投资建议，只做技术演示分析。
+- 只能基于我提供的数据分析，不要编造其他信息。
 
-Stock data:
+股票数据：
 ${JSON.stringify(stockData, null, 2)}`;
 }
 
@@ -53,7 +55,7 @@ function createRequestBody(model, stockData, includeResponseFormat) {
       {
         role: "system",
         content:
-          "You are a financial data analysis assistant. You must return only strict JSON that matches the requested schema.",
+          "你是一个股票数据分析助手。你必须只返回严格 JSON，并且 JSON 必须符合用户给出的 schema。",
       },
       { role: "user", content: buildPrompt(stockData) },
     ],
