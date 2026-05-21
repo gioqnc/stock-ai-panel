@@ -24,7 +24,7 @@ Render URL：部署后填写，例如 `https://stock-ai-panel.onrender.com`
 
 - React + TypeScript + Vite
 - Express
-- Alpha Vantage `TIME_SERIES_DAILY`
+- Yahoo Finance chart endpoint + optional Stooq CSV + Alpha Vantage fallback
 - OpenAI-compatible Chat Completions API
 - Supabase Postgres
 - Render
@@ -55,6 +55,8 @@ http://localhost:3000/api/health
 
 ```env
 ALPHA_VANTAGE_API_KEY=
+STOCK_CACHE_TTL_MINUTES=720
+STOOQ_API_KEY=
 LLM_API_KEY=
 LLM_BASE_URL=https://api.openai.com/v1
 LLM_MODEL=gpt-4o-mini
@@ -66,7 +68,9 @@ PORT=3000
 
 说明：
 
-- `ALPHA_VANTAGE_API_KEY`：用于获取股票行情。
+- `ALPHA_VANTAGE_API_KEY`：备用行情 API Key；主行情源失败时使用。
+- `STOCK_CACHE_TTL_MINUTES`：行情缓存时间，默认 720 分钟。
+- `STOOQ_API_KEY`：可选。Stooq CSV 下载 key；不填时使用 Yahoo Finance 免 key 行情源。
 - `LLM_API_KEY`：用于调用大模型。
 - `LLM_BASE_URL`：兼容 OpenAI Chat Completions 的接口地址。
 - `LLM_MODEL`：使用的模型名称。
