@@ -199,89 +199,81 @@ PORT
 
 ## Debug 记录
 
-### 问题：LLM 偶尔返回 Markdown 代码块，导致 JSON 解析失败
-
-现象：
-
-```text
-LLM 返回内容不是合法 JSON，请重试
-```
-
-排查：
-
-我让 AI 工具检查 Prompt 和后端解析逻辑，发现只写“返回 JSON”不够稳定，模型可能返回：
-
-````text
-```json
-{ "summary": "...", "sentiment": "Neutral", "risk_level": "Medium" }
-```
-````
-
-解决：
-
-1. Prompt 增加 `Return ONLY valid JSON. Do not include markdown, comments, explanations, or extra text.`
-2. API 请求增加 `response_format: { type: "json_object" }`
-3. 后端用 `zod` 校验字段和枚举值
-
-结果：
-
-后端只接受这种结构：
-
-```json
-{
-  "summary": "Recent prices show moderate movement with no strong trend.",
-  "sentiment": "Neutral",
-  "risk_level": "Medium"
-}
-```
-
-### 问题：本地前端请求后端出现 CORS 或 404
-
-现象：
-
-```text
-GET http://localhost:5173/api/health 404
-```
-
-解决：
-
-在 `vite.config.ts` 中配置代理：
-
-```ts
-server: {
-  proxy: {
-    '/api': 'http://localhost:3000',
-  },
-}
-```
-
-同时后端启用：
-
-```js
-app.use(cors({ origin: clientOrigin, credentials: false }));
-```
-
 ### 问题：线上点击 AI 分析并保存时显示 Failed to fetch
 
 现象：
+
+部署到 Render 后，打开线上地址：
+
+```text
+https://stock-ai-panel-wury.onrender.com/
+```
+
+输入 `NVDA` 后点击 `AI 分析并保存`，页面左侧提示：
 
 ```text
 Failed to fetch
 ```
 
-排查：
+真实排查过程：
 
-用 AI 工具和浏览器调试时发现，后端接口和 Supabase 保存逻辑本身是正常的，历史记录里已经能看到新数据。但前端调用 `POST /api/analyze` 时，浏览器环境会直接报 `Failed to fetch`，页面拿不到响应。
+1. 先看 Supabase 的 `stock_analyses` 表，发现有些分析记录已经写入，说明 Supabase 连接和保存逻辑不是主要问题。
+2. 再用浏览器复现线上页面操作，点击 `AI 分析并保存` 后仍然显示 `Failed to fetch`，但页面历史记录可以正常读取。
+3. 用接口直接请求后端，确认 `/api/stock/:symbol`、`/api/analyses` 和后端保存逻辑可以正常工作。
+4. 检查 Render 环境变量和 CORS 配置，发现 `CLIENT_ORIGIN` 曾经带了末尾 `/`，先在后端做了归一化处理：
 
-解决：
+```js
+const clientOrigin = (process.env.CLIENT_ORIGIN || "http://localhost:5173").replace(/\/+$/, "");
+```
 
-1. 将前端分析接口从 `/api/analyze` 改为 `/api/stock-analysis`，避开浏览器或插件对 `analyze` 路径的误拦截。
-2. 后端新增 `POST /api/stock-analysis`，同时保留 `/api/analyze` 作为兼容旧接口。
-3. 前端增加恢复逻辑：如果分析请求失败，但后端已经保存成功，就从 `/api/analyses` 读取最新历史记录并展示。
+5. 继续在浏览器里点按钮测试，发现 `POST /api/analyze` 这个路径仍然容易触发浏览器环境里的 `Failed to fetch`。为了避免路径被误拦截，我把分析接口改成更明确的业务路径 `/api/stock-analysis`。
 
-结果：
+实际修改：
 
-线上重新部署后，点击 `AI 分析并保存` 可以展示行情、AI JSON 分析结果，并写入 Supabase 历史记录。
+后端把分析逻辑抽成同一个处理函数，并同时支持新旧两个接口：
+
+```js
+async function handleStockAnalysis(req, res, next) {
+  try {
+    const symbol = validateSymbol(req.body?.symbol);
+    const quote = await fetchStockData(symbol);
+    const analysis = await analyzeStock(quote);
+    const saved = await saveAnalysis({ symbol, quote, analysis });
+
+    res.json({
+      symbol,
+      quote,
+      analysis,
+      persisted: saved.persisted,
+      id: saved.id,
+      warning: saved.persisted ? null : "Supabase 未配置，本次结果未写入数据库",
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+app.post("/api/stock-analysis", handleStockAnalysis);
+app.post("/api/analyze", handleStockAnalysis);
+```
+
+前端请求从旧接口：
+
+```ts
+await apiRequest<AnalyzeResponse>('/api/analyze', ...)
+```
+
+改成：
+
+```ts
+await apiRequest<AnalyzeResponse>('/api/stock-analysis', ...)
+```
+
+同时我还加了一个兜底逻辑：如果浏览器没有拿到分析接口响应，但后端已经写入成功，就从 `/api/analyses` 重新读取最近的历史记录并展示。
+
+最终结果：
+
+重新提交 GitHub 并让 Render 自动部署后，再次打开线上页面测试。输入 `NVDA` 点击 `AI 分析并保存`，页面可以正常展示行情卡片、AI JSON 分析结果和历史记录，Supabase 的 `stock_analyses` 表里也能看到新增记录。
 
 ## 参考链接
 
