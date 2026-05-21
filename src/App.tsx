@@ -185,6 +185,35 @@ function App() {
     }
   }
 
+  async function recoverAnalyzeFromHistory(symbolToRecover: string, startedAt: number) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (attempt > 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, 2000))
+      }
+
+      const data = await apiRequest<{ records: HistoryRecord[]; persisted: boolean }>('/api/analyses')
+      setHistory(data.records)
+
+      const savedRecord = data.records.find((record) => {
+        const createdAt = new Date(record.created_at).getTime()
+        return (
+          record.symbol === symbolToRecover &&
+          Number.isFinite(createdAt) &&
+          createdAt >= startedAt - 10000
+        )
+      })
+
+      if (savedRecord) {
+        setQuote(savedRecord.quote)
+        setAnalysis(savedRecord.analysis)
+        setNotice('分析已保存，已从历史记录载入结果')
+        return true
+      }
+    }
+
+    return false
+  }
+
   async function handleAnalyze() {
     if (!normalizedSymbol) {
       setError('请输入股票代码')
@@ -194,6 +223,7 @@ function App() {
     setError('')
     setNotice('')
     setLoadingAnalysis(true)
+    const startedAt = Date.now()
 
     try {
       const data = await apiRequest<AnalyzeResponse>('/api/analyze', {
@@ -206,7 +236,15 @@ function App() {
       setNotice(data.warning || '分析已完成并保存')
       await loadHistory()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'AI 分析失败')
+      const message = err instanceof Error ? err.message : 'AI 分析失败'
+      try {
+        const recovered = await recoverAnalyzeFromHistory(normalizedSymbol, startedAt)
+        if (!recovered) {
+          setError(message)
+        }
+      } catch {
+        setError(message)
+      }
     } finally {
       setLoadingAnalysis(false)
     }
